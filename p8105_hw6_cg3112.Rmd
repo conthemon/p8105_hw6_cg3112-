@@ -1,0 +1,20 @@
+---
+title: "p8105_hw6_cg3112"
+output: html_document
+---
+
+```{r}
+library(tidyr)
+library(plotly)
+library(dplyr)
+library(tidyverse
+)
+```
+
+
+# Problem 1
+
+```{r}
+births <- read_csv("./birthweight.csv")
+```
+
