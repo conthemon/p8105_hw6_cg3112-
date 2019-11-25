@@ -8,7 +8,8 @@ library(tidyr)
 library(plotly)
 library(dplyr)
 library(tidyverse)
-
+library(modelr)
+library(mgcv)
 set.seed(1)
 ```
 
@@ -36,17 +37,63 @@ Lets propose a model based on scientific knowledge of predictors of birth weight
 
 ```{r}
 weight <-
-  lm(bwt ~ momage + delwt + smoken + wtgain, data = births) %>% 
+  lm(bwt ~ momage + delwt + smoken + wtgain, data = births) 
+
+weighting <- weight %>% 
   broom::tidy() %>%
    knitr::kable(digits = 3)
 
-weight
+weighting
 ```
 
 We'll next add the residuals and predictions: 
 ```{r}
-res_pred <- weight %>%
-   modelr::add_residuals(fit) %>%
-   modelr::add_predictions(fit)
+res_pred <- births %>%
+   modelr::add_residuals( weight) %>%
+   modelr::add_predictions( weight)
+
+res_pred %>%
+   ggplot(aes(x = pred, y = resid)) + geom_point()
+```
+
+In comparing our model to other models:
+
+```{r}
+
+train <- sample_frac(births, size = .8)
+test <- sample_frac(births, size = .2)
+
+cv_df = 
+  crossv_mc(births, 100) 
+
+cv_df =
+  cv_df %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble))
+
+model1 <- lm(bwt ~ blength + gaweeks, data = births)
+model2 <- lm(bwt ~ bhead * blength * babysex, data = births)
+
+out <- model2 %>%
+   broom::tidy() 
+
+births %>% 
+   gather_predictions(weight, model1, model2) %>%
+   mutate (
+     model = fct_inorder(model)) %>%
+     ggplot(aes(x = , y = bwt)) + 
+     geom_point() + 
+     geom_line(aes(y = pred), color = "red") + 
+     facet_wrap(~model)
+   
+```
+It appears that both of the other models do a better
+
+```{r}
+weight_r <- rmse(weight, births)
+model1_r <- rmse(model1, births)
+model2_r <- rmse(model2, births)
+
 ```
 
