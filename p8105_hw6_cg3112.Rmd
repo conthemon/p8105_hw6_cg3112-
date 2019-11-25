@@ -3,7 +3,7 @@ title: "p8105_hw6_cg3112"
 output: html_document
 ---
 
-```{r}
+```{r include=FALSE}
 library(tidyr)
 library(plotly)
 library(dplyr)
@@ -55,6 +55,8 @@ res_pred <- births %>%
 res_pred %>%
    ggplot(aes(x = pred, y = resid)) + geom_point()
 ```
+This model does not appear to be linearly correlated with the data.
+
 
 In comparing our model to other models:
 
@@ -106,12 +108,70 @@ cv_df %>%
 #     facet_wrap(~model)
    
 ```
-It appears that both of the other models do a better
+It appears that both of the other models do a better than my model. Model 2 has the lowest and most consistent RMSE.
+
+# Question 2
 
 ```{r}
-weight_r <- rmse(weight, births)
-model1_r <- rmse(model1, births)
-model2_r <- rmse(model2, births)
-
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(id, USW00094728 = "CentralPark_NY"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
 ```
 
+Let's get strapping
+```{r}
+straps <- 
+   weather_df %>%
+   modelr::bootstrap(n = 5000) %>%
+   mutate (
+      models = map(strap, ~lm(tmax ~ tmin, data = .x) ),
+      results = map(models, broom::glance)
+      ) %>%
+   select(-strap, -models) %>%
+   janitor::clean_names() %>%
+   unnest(results)
+
+straps %>%
+   ggplot(aes(x=statistic)) + geom_density()
+
+quantile(straps$r.squared, probs=c(0.025, 0.975))
+```
+We can see that the 95% confidence interval for R-squared ranges 0.89 to 0.93.
+
+```{r}
+straps2 <- 
+   weather_df %>%
+   modelr::bootstrap(n = 5000) %>%
+   mutate (
+      models = map(strap, ~lm(tmax ~ tmin, data = .x) ),
+      results = map(models, broom::tidy)
+      ) %>%
+   select(-strap, -models) %>%
+   janitor::clean_names() %>%
+   unnest(results)
+
+logging <- straps2 %>%
+   select(term, estimate) %>%
+   pivot_wider(
+      names_from = "term",
+      values_from = "estimate") %>%
+   unnest() %>%
+   janitor::clean_names() %>%
+   mutate (
+      logs = log(intercept*tmin)
+   )
+
+logging %>%
+   ggplot(aes(x=logs)) + geom_density()
+
+quantile(logging$logs, probs=c(0.025, 0.975))
+```
+Here we can see that the 95% CI for the log calculation is 1.965 to 2.059.
