@@ -7,14 +7,46 @@ output: html_document
 library(tidyr)
 library(plotly)
 library(dplyr)
-library(tidyverse
-)
+library(tidyverse)
+
+set.seed(1)
 ```
 
 
 # Problem 1
 
 ```{r}
-births <- read_csv("./birthweight.csv")
+births <- read_csv("./birthweight.csv") %>%
+  mutate(
+   babysex = as.factor(babysex),
+   frace = as.factor(frace),
+   malform = as.factor(malform),
+   mrace = as.factor(mrace)
+  )
+
+```
+
+Checking for missing data:
+```{r}
+skimr::skim(births)
+```
+There does not appear to be any missing values.
+
+Lets propose a model based on scientific knowledge of predictors of birth weight:
+
+```{r}
+weight <-
+  lm(bwt ~ momage + delwt + smoken + wtgain, data = births) %>% 
+  broom::tidy() %>%
+   knitr::kable(digits = 3)
+
+weight
+```
+
+We'll next add the residuals and predictions: 
+```{r}
+res_pred <- weight %>%
+   modelr::add_residuals(fit) %>%
+   modelr::add_predictions(fit)
 ```
 
