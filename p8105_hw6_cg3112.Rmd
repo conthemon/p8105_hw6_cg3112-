@@ -60,11 +60,11 @@ In comparing our model to other models:
 
 ```{r}
 
-train <- sample_frac(births, size = .8)
-test <- sample_frac(births, size = .2)
+#train <- sample_frac(births, size = .8)
+#test <- sample_frac(births, size = .2)
 
 cv_df = 
-  crossv_mc(births, 100) 
+  crossv_mc(births, 100, test = 0.2) 
 
 cv_df =
   cv_df %>% 
@@ -72,20 +72,38 @@ cv_df =
     train = map(train, as_tibble),
     test = map(test, as_tibble))
 
-model1 <- lm(bwt ~ blength + gaweeks, data = births)
-model2 <- lm(bwt ~ bhead * blength * babysex, data = births)
+#model1 <- lm(bwt ~ blength + gaweeks, data = train)
+#model2 <- lm(bwt ~ bhead * blength * babysex, data = train)
 
-out <- model2 %>%
-   broom::tidy() 
+cv_df <- cv_df %>% 
+   mutate(
+    weight = map(train, ~lm(bwt ~ momage + delwt + smoken + wtgain, data=.x)),
+    model1 = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+    model2 = map(train, ~lm(bwt ~ bhead * blength * babysex, data=.x))) %>% 
+  mutate(
+     rmse_weight = map2_dbl(weight, test, ~rmse(model = .x, data = .y)),
+     rmse_model1 = map2_dbl(model1, test, ~rmse(model = .x, data = .y)),
+     rmse_model2 = map2_dbl(model2, test, ~rmse(model = .x, data = .y))
+     )
 
-births %>% 
-   gather_predictions(weight, model1, model2) %>%
-   mutate (
-     model = fct_inorder(model)) %>%
-     ggplot(aes(x = , y = bwt)) + 
-     geom_point() + 
-     geom_line(aes(y = pred), color = "red") + 
-     facet_wrap(~model)
+cv_df %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") %>% 
+  mutate(model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) + geom_violin()
+
+#test %>% 
+#   gather_predictions(weight, model1, model2) %>%
+#   mutate (
+#     model = fct_inorder(model)) %>%
+#     ggplot(aes(x = pred , y = bwt)) + 
+#     geom_point() + 
+#     geom_line(aes(y = pred), color = "red") + 
+#     facet_wrap(~model)
    
 ```
 It appears that both of the other models do a better
